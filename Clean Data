@@ -1,1 +1,808 @@
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+# Find the main project folder reliably
+BASE_DIR = Path(__file__).resolve().parent.parent
+RAW_DIR = BASE_DIR / 'data' / 'raw'
+CLEANED_DIR = BASE_DIR / 'data' / 'cleaned'
+CLEANED_DIR.mkdir(parents=True, exist_ok=True)
+
+#Import libraries and load dataset
+df = pd.read_csv(RAW_DIR / "account_status_5000.csv")
+
+print(df.head())
+print(df.shape)
+print(df.info())
+
+#Check missing values
+print(df.isnull().sum())
+
+#Check missing-value percentages:
+missing_percentage = (df.isnull().sum() / len(df)) * 100
+
+print(missing_percentage)
+
+#Remove duplicate records
+print("Duplicate rows:", df.duplicated().sum())
+
+df = df.drop_duplicates()
+
+#Check duplicate customer IDs:
+print(df["customer_id"].duplicated().sum())
+
+df = df.drop_duplicates(subset=["customer_id"], keep="first")
+
+#Clean text columns
+text_columns = ["customer_id", "account_status", "closure_reason"]
+
+for col in text_columns:
+    df[col] = df[col].str.strip()
+
+
+df["account_status"] = df["account_status"].str.title()
+
+
+
+#Convert date colum
+df["closure_date"] = pd.to_datetime(
+    df["closure_date"],
+    errors="coerce"
+)
+
+#Handle missing values
+
+print(df.groupby("account_status")[
+    ["closure_date", "closure_reason"]
+].apply(lambda x: x.isnull().sum()))
+
+
+closed_missing = df[
+    (df["account_status"] == "Closed") &
+    (df["closure_date"].isnull() | df["closure_reason"].isnull())
+]
+
+print(closed_missing)
+
+
+#Validate data
+print(df["account_status"].value_counts())
+
+valid_status = ["Active", "Inactive", "Closed"]
+
+invalid_status = df[
+    ~df["account_status"].isin(valid_status)
+]
+
+print(invalid_status)
+
+print(df["customer_id"].isnull().sum())
+
+
+#Final dataset inspection
+print("Final Shape:", df.shape)
+
+print("Missing Values:")
+print(df.isnull().sum())
+
+print("Duplicate Rows:", df.duplicated().sum())
+
+print(df.head())
+
+#Export cleaned dataset
+df.to_csv(CLEANED_DIR / "cleaned_account_status.csv", index=False)
+
+print("Account Status Dataset Cleaned Successfully!")
+# ==========================================
+# CUSTOMER DATASET - COMPLETE DATA CLEANING
+# ==========================================
+
+# STEP 1: Import libraries
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+# Find the main project folder reliably
+BASE_DIR = Path(__file__).resolve().parent.parent
+RAW_DIR = BASE_DIR / 'data' / 'raw'
+CLEANED_DIR = BASE_DIR / 'data' / 'cleaned'
+CLEANED_DIR.mkdir(parents=True, exist_ok=True)
+
+# STEP 2: Load dataset
+df = pd.read_csv(RAW_DIR / "customers_5000.csv")
+
+# STEP 3: Initial inspection
+print("First 5 Records:")
+print(df.head())
+
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nDataset Information:")
+df.info()
+
+# STEP 4: Check duplicate records
+print("\nDuplicate Rows:", df.duplicated().sum())
+
+# Remove exact duplicate rows
+df = df.drop_duplicates()
+
+# Check duplicate customer IDs
+print("\nDuplicate Customer IDs:",
+      df["customer_id"].duplicated().sum())
+
+# Remove duplicate customer IDs, retaining first record
+# Only appropriate if customer_id must be unique
+df = df.drop_duplicates(subset=["customer_id"], keep="first")
+
+# STEP 5: Clean column names
+df.columns = df.columns.str.strip().str.lower()
+
+# STEP 6: Clean text columns
+text_columns = [
+    "customer_id",
+    "age_group",
+    "city",
+    "income_band",
+    "card_type"
+]
+
+for col in text_columns:
+    df[col] = df[col].astype("string").str.strip()
+
+# Standardize text values
+df["city"] = df["city"].str.title()
+df["income_band"] = df["income_band"].str.title()
+df["card_type"] = df["card_type"].str.title()
+df["age_group"] = df["age_group"].str.strip()
+
+# Replace empty strings with missing values
+df[text_columns] = df[text_columns].replace(
+    r"^\s*$", pd.NA, regex=True
+)
+
+# STEP 7: Check missing values
+print("\nMissing Values Before Cleaning:")
+print(df.isnull().sum())
+
+# STEP 8: Handle missing income_band
+# Check the most frequent income category
+print("\nIncome Band Counts:")
+print(df["income_band"].value_counts(dropna=False))
+
+# Fill missing income_band with mode
+# This is a simple baseline approach, not a verified income value
+income_mode = df["income_band"].mode()
+
+if not income_mode.empty:
+    df["income_band"] = df["income_band"].fillna(
+        income_mode.iloc[0]
+    )
+
+# STEP 9: Convert date column
+df["card_open_date"] = pd.to_datetime(
+    df["card_open_date"],
+    errors="coerce"
+)
+
+# STEP 10: Convert credit_limit into numeric
+df["credit_limit"] = pd.to_numeric(
+    df["credit_limit"],
+    errors="coerce"
+)
+
+# STEP 11: Validate credit limit
+# Credit limit should not be negative
+invalid_credit = df[df["credit_limit"] < 0]
+
+print("\nInvalid Credit Limits:")
+print(invalid_credit)
+
+# Replace negative credit limits with missing values
+df.loc[df["credit_limit"] < 0, "credit_limit"] = np.nan
+
+# STEP 12: Validate age groups
+valid_age_groups = [
+    "18-25",
+    "26-35",
+    "36-45",
+    "46-55",
+    "56-65",
+    "65+"
+]
+
+invalid_age = df[
+    ~df["age_group"].isin(valid_age_groups)
+]
+
+print("\nInvalid Age Groups:")
+print(invalid_age)
+
+# STEP 13: Validate card types
+print("\nCard Type Counts:")
+print(df["card_type"].value_counts(dropna=False))
+
+# STEP 14: Check future opening dates
+today = pd.Timestamp.today().normalize()
+
+future_dates = df[df["card_open_date"] > today]
+
+print("\nFuture Opening Dates:")
+print(future_dates)
+
+# STEP 15: Final missing value check
+print("\nFinal Missing Values:")
+print(df.isnull().sum())
+
+# STEP 16: Final duplicate check
+print("\nFinal Duplicate Rows:", df.duplicated().sum())
+
+print("\nFinal Dataset Shape:")
+print(df.shape)
+
+# STEP 17: Export cleaned dataset
+df.to_csv(CLEANED_DIR / "cleaned_customers.csv", index=False)
+
+print("\nCustomer Dataset Cleaned Successfully!")
+
+# ==========================================
+# REPAYMENTS DATASET - COMPLETE DATA CLEANING
+# ==========================================
+
+# STEP 1: Import libraries
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+# Find the main project folder reliably
+BASE_DIR = Path(__file__).resolve().parent.parent
+RAW_DIR = BASE_DIR / 'data' / 'raw'
+CLEANED_DIR = BASE_DIR / 'data' / 'cleaned'
+CLEANED_DIR.mkdir(parents=True, exist_ok=True)
+
+# STEP 2: Load dataset
+df = pd.read_csv(RAW_DIR / "repayments_5000.csv")
+
+# STEP 3: Initial inspection
+print("First 5 Records:")
+print(df.head())
+
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nDataset Information:")
+df.info()
+
+# STEP 4: Check duplicate rows
+print("\nDuplicate Rows:", df.duplicated().sum())
+
+# Remove exact duplicate rows
+df = df.drop_duplicates()
+
+# Check duplicate customer and statement month combinations
+print("\nDuplicate Customer-Month Records:")
+print(
+    df.duplicated(
+        subset=["customer_id", "statement_month"]
+    ).sum()
+)
+
+# Remove duplicate customer-month records only after
+# checking which record is correct.
+# Here we retain the first record as a cleaning rule.
+df = df.drop_duplicates(
+    subset=["customer_id", "statement_month"],
+    keep="first"
+)
+
+# STEP 5: Clean column names
+df.columns = df.columns.str.strip().str.lower()
+
+# STEP 6: Clean customer ID
+df["customer_id"] = (
+    df["customer_id"].astype("string").str.strip()
+)
+
+# STEP 7: Clean statement month
+df["statement_month"] = (
+    df["statement_month"].astype("string").str.strip()
+)
+
+# Convert statement month into datetime
+df["statement_month"] = pd.to_datetime(
+    df["statement_month"],
+    format="%Y-%m",
+    errors="coerce"
+)
+
+# STEP 8: Convert payment date into datetime
+df["payment_date"] = pd.to_datetime(
+    df["payment_date"],
+    errors="coerce"
+)
+
+# STEP 9: Convert amount columns into numeric
+numeric_columns = [
+    "bill_amount",
+    "amount_paid",
+    "days_late"
+]
+
+for col in numeric_columns:
+    df[col] = pd.to_numeric(
+        df[col],
+        errors="coerce"
+    )
+
+# STEP 10: Check missing values
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# STEP 11: Check negative bill amounts
+negative_bills = df[df["bill_amount"] < 0]
+
+print("\nNegative Bill Amounts:")
+print(negative_bills)
+
+# Replace invalid negative bills with NaN
+df.loc[df["bill_amount"] < 0, "bill_amount"] = np.nan
+
+# STEP 12: Check negative payment amounts
+negative_payments = df[df["amount_paid"] < 0]
+
+print("\nNegative Payments:")
+print(negative_payments)
+
+# Replace invalid negative payments with NaN
+df.loc[df["amount_paid"] < 0, "amount_paid"] = np.nan
+
+# STEP 13: Check negative days late
+negative_days = df[df["days_late"] < 0]
+
+print("\nNegative Days Late:")
+print(negative_days)
+
+# Replace invalid negative days with NaN
+df.loc[df["days_late"] < 0, "days_late"] = np.nan
+
+# STEP 14: Check overpayments
+overpayments = df[
+    df["amount_paid"] > df["bill_amount"]
+]
+
+print("\nOverpayment Records:")
+print(overpayments)
+
+# Do not automatically remove overpayments.
+# They may represent advance payments or credits.
+
+# STEP 15: Check date consistency
+invalid_dates = df[
+    df["payment_date"] < df["statement_month"]
+]
+
+print("\nPayment Before Statement Month:")
+print(invalid_dates)
+
+# These records need investigation.
+# Do not delete them automatically.
+
+# STEP 16: Create payment status column
+df["payment_status"] = np.select(
+    [
+        df["amount_paid"] == 0,
+        df["amount_paid"] < df["bill_amount"],
+        df["amount_paid"] == df["bill_amount"],
+        df["amount_paid"] > df["bill_amount"]
+    ],
+    [
+        "Unpaid",
+        "Partially Paid",
+        "Fully Paid",
+        "Overpaid"
+    ],
+    default="Unknown"
+)
+
+# STEP 17: Create late payment category
+df["late_payment_status"] = np.where(
+    df["days_late"] > 0,
+    "Late",
+    "On Time"
+)
+
+# Preserve missing days_late as unknown
+df.loc[
+    df["days_late"].isna(),
+    "late_payment_status"
+] = "Unknown"
+
+# STEP 18: Final validation
+print("\nFinal Dataset Shape:")
+print(df.shape)
+
+print("\nFinal Missing Values:")
+print(df.isnull().sum())
+
+print("\nFinal Duplicate Rows:")
+print(df.duplicated().sum())
+
+print("\nPayment Status Counts:")
+print(df["payment_status"].value_counts())
+
+print("\nLate Payment Counts:")
+print(df["late_payment_status"].value_counts())
+
+# STEP 19: Export cleaned dataset
+df.to_csv(CLEANED_DIR / "cleaned_repayments.csv", index=False)
+
+print("\nRepayments Dataset Cleaned Successfully!")
+
+
+# ==========================================
+# REWARDS DATASET - COMPLETE DATA CLEANING
+# ==========================================
+
+# STEP 1: Import libraries
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+# Find the main project folder reliably
+BASE_DIR = Path(__file__).resolve().parent.parent
+RAW_DIR = BASE_DIR / 'data' / 'raw'
+CLEANED_DIR = BASE_DIR / 'data' / 'cleaned'
+CLEANED_DIR.mkdir(parents=True, exist_ok=True)
+
+# STEP 2: Load dataset
+df = pd.read_csv(RAW_DIR / "rewards_5000.csv")
+
+# STEP 3: Initial inspection
+print("First 5 Records:")
+print(df.head())
+
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nDataset Information:")
+df.info()
+
+# STEP 4: Check duplicate rows
+print("\nDuplicate Rows:", df.duplicated().sum())
+
+# Remove exact duplicate rows
+df = df.drop_duplicates()
+
+# Check duplicate customer and statement month
+print("\nDuplicate Customer-Month Records:")
+print(
+    df.duplicated(
+        subset=["customer_id", "statement_month"]
+    ).sum()
+)
+
+# Remove duplicate customer-month records
+# Retain first record only if one record per month is expected
+df = df.drop_duplicates(
+    subset=["customer_id", "statement_month"],
+    keep="first"
+)
+
+# STEP 5: Clean column names
+df.columns = df.columns.str.strip().str.lower()
+
+# STEP 6: Clean customer IDs
+df["customer_id"] = (
+    df["customer_id"].astype("string").str.strip()
+)
+
+# STEP 7: Clean statement month
+df["statement_month"] = (
+    df["statement_month"].astype("string").str.strip()
+)
+
+# Convert statement month into datetime
+df["statement_month"] = pd.to_datetime(
+    df["statement_month"],
+    format="%Y-%m",
+    errors="coerce"
+)
+
+# STEP 8: Convert numeric columns
+numeric_columns = [
+    "reward_points_earned",
+    "points_redeemed",
+    "cashback_amount"
+]
+
+for col in numeric_columns:
+    df[col] = pd.to_numeric(
+        df[col],
+        errors="coerce"
+    )
+
+# STEP 9: Check missing values
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# STEP 10: Check negative reward points
+negative_earned = df[
+    df["reward_points_earned"] < 0
+]
+
+print("\nNegative Reward Points:")
+print(negative_earned)
+
+# Replace invalid negative points with NaN
+df.loc[
+    df["reward_points_earned"] < 0,
+    "reward_points_earned"
+] = np.nan
+
+# STEP 11: Check negative redeemed points
+negative_redeemed = df[
+    df["points_redeemed"] < 0
+]
+
+print("\nNegative Redeemed Points:")
+print(negative_redeemed)
+
+# Replace invalid negative points with NaN
+df.loc[
+    df["points_redeemed"] < 0,
+    "points_redeemed"
+] = np.nan
+
+# STEP 12: Check negative cashback
+negative_cashback = df[
+    df["cashback_amount"] < 0
+]
+
+print("\nNegative Cashback:")
+print(negative_cashback)
+
+# Replace invalid negative cashback with NaN
+df.loc[
+    df["cashback_amount"] < 0,
+    "cashback_amount"
+] = np.nan
+
+# STEP 13: Check redeemed points greater than earned points
+invalid_redemption = df[
+    df["points_redeemed"] >
+    df["reward_points_earned"]
+]
+
+print("\nRedeemed More Than Earned:")
+print(invalid_redemption)
+
+# Do not automatically delete these records.
+# Check whether opening reward balances or carry-forward
+# points are included in the business rules.
+
+# STEP 14: Create remaining points column
+df["remaining_points"] = (
+    df["reward_points_earned"] -
+    df["points_redeemed"]
+)
+
+# Keep invalid negative remaining balances for investigation
+# rather than replacing them with zero.
+
+# STEP 15: Create redemption status
+df["redemption_status"] = np.select(
+    [
+        df["points_redeemed"] == 0,
+        df["points_redeemed"] > 0
+    ],
+    [
+        "Not Redeemed",
+        "Redeemed"
+    ],
+    default="Unknown"
+)
+
+# STEP 16: Check cashback statistics
+print("\nCashback Statistics:")
+print(df["cashback_amount"].describe())
+
+# STEP 17: Final validation
+print("\nFinal Dataset Shape:")
+print(df.shape)
+
+print("\nFinal Missing Values:")
+print(df.isnull().sum())
+
+print("\nFinal Duplicate Rows:")
+print(df.duplicated().sum())
+
+print("\nRedemption Status:")
+print(df["redemption_status"].value_counts())
+
+# STEP 18: Export cleaned dataset
+df.to_csv(CLEANED_DIR / "cleaned_rewards.csv", index=False)
+
+print("\nRewards Dataset Cleaned Successfully!")
+
+# ==========================================
+# TRANSACTIONS DATASET - COMPLETE DATA CLEANING
+# ==========================================
+
+# STEP 1: Import libraries
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+# Find the main project folder reliably
+BASE_DIR = Path(__file__).resolve().parent.parent
+RAW_DIR = BASE_DIR / 'data' / 'raw'
+CLEANED_DIR = BASE_DIR / 'data' / 'cleaned'
+CLEANED_DIR.mkdir(parents=True, exist_ok=True)
+
+# STEP 2: Load dataset
+df = pd.read_csv(RAW_DIR / "transactions_5000.csv")
+
+# STEP 3: Initial inspection
+print("First 5 Records:")
+print(df.head())
+
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nDataset Information:")
+df.info()
+
+# STEP 4: Check duplicate rows
+print("\nDuplicate Rows:", df.duplicated().sum())
+
+# Remove exact duplicate rows
+df = df.drop_duplicates()
+
+# STEP 5: Check duplicate transaction IDs
+print("\nDuplicate Transaction IDs:",
+      df["txn_id"].duplicated().sum())
+
+# Remove duplicate transaction IDs only after
+# checking which transaction record is correct.
+# Here we retain the first occurrence.
+df = df.drop_duplicates(
+    subset=["txn_id"],
+    keep="first"
+)
+
+# STEP 6: Clean column names
+df.columns = df.columns.str.strip().str.lower()
+
+# STEP 7: Clean text columns
+text_columns = [
+    "txn_id",
+    "customer_id",
+    "merchant_category",
+    "channel",
+    "txn_city"
+]
+
+for col in text_columns:
+    df[col] = df[col].astype("string").str.strip()
+
+# Standardize text values
+df["merchant_category"] = (
+    df["merchant_category"].str.title()
+)
+
+df["channel"] = df["channel"].str.title()
+
+df["txn_city"] = df["txn_city"].str.title()
+
+# Replace empty strings with missing values
+df[text_columns] = df[text_columns].replace(
+    r"^\s*$", pd.NA, regex=True
+)
+
+# STEP 8: Convert transaction date
+df["txn_date"] = pd.to_datetime(
+    df["txn_date"],
+    errors="coerce"
+)
+
+# STEP 9: Convert transaction amount into numeric
+df["amount"] = pd.to_numeric(
+    df["amount"],
+    errors="coerce"
+)
+
+# STEP 10: Check missing values
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# STEP 11: Handle missing merchant categories
+# Use Unknown instead of deleting transactions
+df["merchant_category"] = (
+    df["merchant_category"].fillna("Unknown")
+)
+
+# STEP 12: Check negative transaction amounts
+negative_amounts = df[df["amount"] < 0]
+
+print("\nNegative Transaction Amounts:")
+print(negative_amounts)
+
+# Negative amounts may represent refunds or reversals.
+# Do not delete them without checking business rules.
+
+# STEP 13: Check zero transaction amounts
+zero_amounts = df[df["amount"] == 0]
+
+print("\nZero Transaction Amounts:")
+print(zero_amounts)
+
+# STEP 14: Check transaction dates
+future_transactions = df[
+    df["txn_date"] > pd.Timestamp.today()
+]
+
+print("\nFuture Transaction Dates:")
+print(future_transactions)
+
+# STEP 15: Validate transaction channels
+print("\nChannel Counts:")
+print(df["channel"].value_counts(dropna=False))
+
+# STEP 16: Validate merchant categories
+print("\nMerchant Category Counts:")
+print(
+    df["merchant_category"].value_counts(
+        dropna=False
+    )
+)
+
+# STEP 17: Create transaction month column
+df["transaction_month"] = (
+    df["txn_date"].dt.to_period("M").astype("string")
+)
+
+# STEP 18: Create transaction amount category
+df["amount_category"] = np.select(
+    [
+        df["amount"] < 1000,
+        df["amount"].between(1000, 5000),
+        df["amount"] > 5000
+    ],
+    [
+        "Low",
+        "Medium",
+        "High"
+    ],
+    default="Unknown"
+)
+
+# STEP 19: Final validation
+print("\nFinal Dataset Shape:")
+print(df.shape)
+
+print("\nFinal Missing Values:")
+print(df.isnull().sum())
+
+print("\nFinal Duplicate Rows:")
+print(df.duplicated().sum())
+
+# STEP 20: Transaction statistics
+print("\nTransaction Amount Statistics:")
+print(df["amount"].describe())
+
+# STEP 21: Transactions by Merchant Category
+print("\nTransactions by Merchant:")
+print(df["merchant_category"].value_counts())
+
+# STEP 22: Transactions by Channel
+print("\nTransactions by Channel:")
+print(df["channel"].value_counts())
+
+# STEP 23: Export cleaned dataset
+df.to_csv(CLEANED_DIR / "cleaned_transactions.csv", index=False)
+
+print("\nTransactions Dataset Cleaned Successfully!")
+
+
+
 
